@@ -4,7 +4,8 @@ import Image from "next/image"
 import RoomCard from './RoomCard'
 import Review from './Review'
 import Contact from './Contact'
-import { studios as data } from '@/mock/data'
+import { get, getDateTimeTime } from "@/utils/requests"
+
 
 const getLines = text => {
 	const lines = text.split("\n")
@@ -17,18 +18,145 @@ const getLines = text => {
 	})
 }
 
+const getContacts = (data) => {
+	const translated = [
+		["site_url", "site"],
+		["contact_phone_number", "phone"],
+		["tg", "tg"],
+		["vk", "vk"],
+		["whats_app", "wa"]
+	]
+
+	const contacts = {}
+	for (let [x, y] in translated) {
+		if (data[x])
+			contacts.push({
+				title: y,
+				value: data[x]
+			})
+	}
+}
+
+const translate = (data) => {
+	return {
+		title: data.name,
+		image: "https://placehold.co/800x240.png",
+		desc: data.description,
+		openTime: getDateTimeTime(data.opening_at),
+		closeTime: getDateTimeTime(data.closing_at),
+		contacts: getContacts(data)
+	}
+}
+
+const mergeReviews = (studio, reviews) => {
+	const dataReviews = []
+	// {
+	// 	rating: 4,
+	// 	text: 'Очень красивая студия, музыканты очень красивые',
+	// 	room: 'Studio 1',
+	// },
+	let ratingSum = 0
+	for (const review of reviews) {
+		ratingSum += review.grade
+		dataReviews.push({
+            rating: review.grade,
+            text: review.text,
+            room: review.date
+        })
+	}
+	return {
+		...studio,
+        rating: ratingSum / reviews.length,
+		reviews: dataReviews,
+	}
+}
+
+const getStudio = async (id) => {
+	return await get("/studios/" + id)
+}
+
+const getReviews = async (id) => {
+	return await get("/studios/" + id + "/reviews")
+}
+
+
 export default function Studio({ id }) {
-	const studio = data.find(s => +s.id === +id)
-		|| {title: "",
-			image: "",
-			desc: "",
-			rating: "0",
-			openTime: "",
-			closeTime: "",
-			options: "",
-			contacts: [],
-			rooms: [],
-			reviews: []}
+	const [studio, setStudio] = useState({
+		title: "",
+		photo: "",
+		desc: "",
+		rating: "",
+		openTime: "",
+		closeTime: "",
+		options: "",
+		rooms: []
+	})
+
+	useEffect(() => {
+		const setData = async () => {
+			const [studio, reviews] = await Promise.all([getStudio(id), getReviews(id)]);
+			// const data = await getData(id)
+			// const reviews = await getReviews(id)
+			// const
+			console.log(studio, reviews)
+			const data = mergeReviews(studio, reviews);
+			console.log(data)
+			setStudio(translate(data))
+		}
+		setData();
+		/* setStudio({
+			title: "Tema Studio",
+			image: "https://placehold.co/800x240.png",
+			desc: "Самые вкусные пирожки с картошкой",
+			rating: "4.4",
+			openTime: "10:00",
+			closeTime: "0:00",
+			options: `Кардан — 50 ₽
+					Тарелки — 50 ₽
+					Другие инструменты — 50 ₽`,
+			contacts: [
+				{
+					title: 'phone',
+					value: '+7 (999) 999-99-99'
+				},
+				{
+					title: 'telegram',
+					value: '@temasaur'
+				}
+			],
+			rooms: [
+				{
+					title: 'Studio 1',
+					price: 300,
+					image: 'https://placehold.co/320x150.png',
+					desc: 'Красивая комната и конкурсы интересные'
+				},
+				{
+					title: 'Studio 2',
+					price: 900,
+					image: 'https://placehold.co/320x150.png',
+					desc: 'Здесь записывались Мэйби Бэйби и Дора'
+				}
+			],
+			reviews: [
+				{
+					rating: 4,
+					text: 'Очень красивая студия, музыканты очень красивые',
+					room: 'Studio 1',
+				},
+				{
+					rating: 5,
+					text: 'Крутая студия, звук хороший, помещения просторные и удобные спасибо создателю сайта за такой удобный сайт',
+					room: 'Studio 1',
+				},
+				{
+					rating: 3,
+					text: 'А мне показалось, что студия пахнет солеными огурцами, а я не люблю соленые огурцы, но сайт крутой поэтому плюс три балла',
+					room: 'Studio 2',
+				}
+			]
+		}) */
+	}, [id])
 
 	return (
 		<article>
@@ -58,7 +186,7 @@ export default function Studio({ id }) {
 			<div className="rooms mb-6">
 				<h2 className="text-lg font-semibold mb-3 relative">Комнаты:</h2>
 				<div className="rooms flex justify-between gap-4 flex-wrap mx-auto conte">{
-					studio.rooms.map((room, index) =>
+					studio.rooms && studio.rooms.map((room, index) =>
 						<RoomCard room={room} studioId={ id } key={index} />
 					)
 				}</div>
